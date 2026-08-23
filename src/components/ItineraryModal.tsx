@@ -9,10 +9,7 @@ export type Itinerary = {
 
 export function ItineraryModal({ itinerary, onClose }: { itinerary: Itinerary; onClose: () => void }) {
   const shareText = encodeURIComponent(
-    `${itinerary.headline}
-
-${itinerary.timeline.map((t) => `${t.time} — ${t.title} @ ${t.place}`).join("
-")}`
+    `${itinerary.headline}\n\n${itinerary.timeline.map((t) => `${t.time} — ${t.title} @ ${t.place}`).join("\n")}`
   );
 
   return (
