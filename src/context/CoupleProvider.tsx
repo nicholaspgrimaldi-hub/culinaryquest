@@ -70,15 +70,8 @@ export function CoupleProvider({ children }: { children: ReactNode }) {
 
   async function createCouple(name: string): Promise<Couple> {
     if (!session) throw new Error("Not signed in");
-    const { data: newCouple, error } = await supabase
-      .from("couples")
-      .insert({ name, created_by: session.user.id })
-      .select()
-      .single();
+    const { data: newCouple, error } = await supabase.rpc("create_couple", { couple_name: name });
     if (error) throw error;
-    await supabase
-      .from("couple_members")
-      .insert({ couple_id: newCouple.id, user_id: session.user.id, partner_label: "Partner 1" });
     await refresh();
     return newCouple as Couple;
   }
