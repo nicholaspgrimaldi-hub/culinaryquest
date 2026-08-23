@@ -9,6 +9,14 @@ import { LogVisitModal } from "../components/LogVisitModal";
 
 type VisitedFilter = "all" | "unvisited" | "wishlist" | "visited";
 type SortKey = "rating" | "closest" | "reviews" | "alpha";
+type MealTypeFilter = "all" | "coffee_breakfast" | "lunch" | "dinner";
+
+const MEAL_TYPE_OPTIONS: { value: MealTypeFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "coffee_breakfast", label: "☕ Coffee & Breakfast" },
+  { value: "lunch", label: "🥪 Lunch" },
+  { value: "dinner", label: "🌙 Dinner" },
+];
 
 export function Discover() {
   const { activeHub, couple } = useCouple();
@@ -18,6 +26,7 @@ export function Discover() {
   const [radiusFilter, setRadiusFilter] = useState<number>(activeHub?.radius_miles ?? 5);
   const [sort, setSort] = useState<SortKey>("rating");
   const [visitedFilter, setVisitedFilter] = useState<VisitedFilter>("unvisited");
+  const [mealTypeFilter, setMealTypeFilter] = useState<MealTypeFilter>("all");
   const [discovering, setDiscovering] = useState(false);
   const [discoverError, setDiscoverError] = useState<string | null>(null);
   const [showAddPlace, setShowAddPlace] = useState(false);
@@ -58,6 +67,7 @@ export function Discover() {
     if (visitedFilter === "unvisited") list = list.filter((r) => !visitedIds.has(r.id));
     if (visitedFilter === "visited") list = list.filter((r) => visitedIds.has(r.id));
     if (visitedFilter === "wishlist") list = list.filter((r) => wishlistIds.has(r.id));
+    if (mealTypeFilter !== "all") list = list.filter((r) => r.meal_type === mealTypeFilter);
 
     const sorted = [...list].sort((a, b) => {
       if (sort === "rating") return (b.rating ?? 0) - (a.rating ?? 0);
@@ -66,7 +76,7 @@ export function Discover() {
       return a.name.localeCompare(b.name);
     });
     return sorted;
-  }, [withDistance, radiusFilter, visitedFilter, wishlistIds, visitedIds, sort]);
+  }, [withDistance, radiusFilter, visitedFilter, mealTypeFilter, wishlistIds, visitedIds, sort]);
 
   const conquered = visitedIds.size;
   const total = restaurants.length;
@@ -164,6 +174,13 @@ export function Discover() {
         {discoverError && <p className="text-xs text-red-500 mt-2">{discoverError}</p>}
       </div>
 
+      <div className="bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-2xl shadow-sm p-4 mb-6 flex items-center gap-3">
+        <span className="text-2xl">☕</span>
+        <p className="text-sm font-semibold">
+          Start a tradition: try a new coffee, bakery, or breakfast spot with your partner every weekend.
+        </p>
+      </div>
+
       <div className="bg-white rounded-2xl border border-orange-100 shadow-sm p-4 mb-6 flex flex-wrap items-center gap-3">
         <div className="flex gap-1 bg-stone-100 rounded-full p-1">
           {(["all", "unvisited", "wishlist", "visited"] as VisitedFilter[]).map((f) => (
@@ -199,6 +216,20 @@ export function Discover() {
           ))}
         </div>
         <span className="ml-auto text-xs text-stone-400">Showing {filtered.length} places</span>
+        <div className="w-full flex items-center gap-2 text-sm border-t border-stone-100 pt-3 mt-1">
+          <span className="text-stone-500">Meal:</span>
+          {MEAL_TYPE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setMealTypeFilter(opt.value)}
+              className={`text-xs font-bold rounded-full px-3 py-1.5 border ${
+                mealTypeFilter === opt.value ? "bg-teal-500 text-white border-teal-500" : "border-stone-300 text-stone-600"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {filtered.length === 0 ? (
