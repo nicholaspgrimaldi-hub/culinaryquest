@@ -57,6 +57,7 @@ export type Restaurant = {
   phone: string | null;
   description: string | null;
   source: "places" | "manual" | "ai";
+  meal_type: "coffee_breakfast" | "lunch" | "dinner" | null;
   created_at: string;
   distance_mi?: number;
 };
