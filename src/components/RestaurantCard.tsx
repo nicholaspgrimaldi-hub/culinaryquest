@@ -1,6 +1,12 @@
 import type { Restaurant } from "../lib/types";
 import { priceLevelToDollars } from "../lib/distance";
 
+const MEAL_TYPE_LABEL: Record<string, string> = {
+  coffee_breakfast: "☕ Coffee & Breakfast",
+  lunch: "🥪 Lunch",
+  dinner: "🌙 Dinner",
+};
+
 export function RestaurantCard({
   restaurant,
   wishlisted,
@@ -59,6 +65,11 @@ export function RestaurantCard({
           )}
         </div>
         {restaurant.tagline && <p className="text-sm italic text-orange-600">"{restaurant.tagline}"</p>}
+        {restaurant.meal_type && (
+          <span className="self-start text-[10px] font-bold uppercase bg-teal-50 text-teal-700 rounded-full px-2 py-1">
+            {MEAL_TYPE_LABEL[restaurant.meal_type]}
+          </span>
+        )}
         <p className="text-xs text-stone-500">
           {restaurant.city ?? ""}
           {restaurant.state ? `, ${restaurant.state}` : ""}
