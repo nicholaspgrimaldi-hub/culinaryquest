@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useCouple } from "../context/CoupleProvider";
 import { callEdgeFunction, supabase } from "../lib/supabaseClient";
 import { distanceMiles } from "../lib/distance";
@@ -31,11 +31,13 @@ export function Discover() {
   const [discoverError, setDiscoverError] = useState<string | null>(null);
   const [showAddPlace, setShowAddPlace] = useState(false);
   const [logVisitFor, setLogVisitFor] = useState<Restaurant | null>(null);
+  const autoDiscoverAttempted = useRef<Set<string>>(new Set());
 
-  async function loadData() {
-    if (!activeHub || !couple) return;
+  async function loadData(): Promise<Restaurant[]> {
+    if (!activeHub || !couple) return [];
     const { data: rest } = await supabase.from("restaurants").select("*").eq("hub_id", activeHub.id);
-    setRestaurants((rest as Restaurant[]) ?? []);
+    const restaurantRows = (rest as Restaurant[]) ?? [];
+    setRestaurants(restaurantRows);
 
     const { data: visits } = await supabase.from("visits").select("restaurant_id").eq("couple_id", couple.id);
     setVisitedIds(new Set((visits ?? []).map((v: any) => v.restaurant_id)));
@@ -46,11 +48,27 @@ export function Discover() {
       .eq("couple_id", couple.id)
       .eq("wishlisted", true);
     setWishlistIds(new Set((flags ?? []).map((f: any) => f.restaurant_id)));
+
+    return restaurantRows;
   }
 
   useEffect(() => {
-    loadData();
+    let cancelled = false;
     if (activeHub) setRadiusFilter(activeHub.radius_miles);
+    (async () => {
+      const rows = await loadData();
+      if (cancelled || !activeHub) return;
+      // Auto-discover: the first time we see a hub with zero restaurants (e.g.
+      // right after it's created), pull real nearby places in automatically
+      // instead of requiring a manual "Discover More Local Spots" click.
+      if (rows.length === 0 && !autoDiscoverAttempted.current.has(activeHub.id)) {
+        autoDiscoverAttempted.current.add(activeHub.id);
+        discoverMore();
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeHub?.id, couple?.id]);
 
@@ -122,7 +140,10 @@ export function Discover() {
         source: "places",
       }));
       if (rows.length > 0) {
-        await supabase.from("restaurants").upsert(rows, { onConflict: "hub_id,google_place_id", ignoreDuplicates: true });
+        const { error: upsertError } = await supabase
+          .from("restaurants")
+          .upsert(rows, { onConflict: "hub_id,google_place_id", ignoreDuplicates: true });
+        if (upsertError) throw upsertError;
       }
       await loadData();
     } catch (err: any) {
