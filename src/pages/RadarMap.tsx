@@ -21,6 +21,7 @@ export function RadarMap() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [visitedIds, setVisitedIds] = useState<Set<string>>(new Set());
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [mapsError, setMapsError] = useState<string | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -40,21 +41,26 @@ export function RadarMap() {
       .then(({ data }) => setVisitedIds(new Set((data ?? []).map((v: any) => v.restaurant_id))));
     supabase
       .from("restaurant_flags")
-      .select("restaurant_id")
+      .select("restaurant_id, wishlisted, dismissed")
       .eq("couple_id", couple.id)
-      .eq("wishlisted", true)
-      .then(({ data }) => setWishlistIds(new Set((data ?? []).map((f: any) => f.restaurant_id))));
+      .then(({ data }) => {
+        setWishlistIds(new Set((data ?? []).filter((f: any) => f.wishlisted).map((f: any) => f.restaurant_id)));
+        setDismissedIds(new Set((data ?? []).filter((f: any) => f.dismissed).map((f: any) => f.restaurant_id)));
+      });
   }, [activeHub?.id, couple?.id]);
 
   const sorted = useMemo(() => {
     if (!activeHub) return [];
     return restaurants
+      // Spots removed from consideration on Discover shouldn't clutter the
+      // map or its list either.
+      .filter((r) => !dismissedIds.has(r.id))
       .map((r) => ({
         ...r,
         distance_mi: r.lat && r.lng ? distanceMiles(activeHub.lat, activeHub.lng, r.lat, r.lng) : undefined,
       }))
       .sort((a, b) => (a.distance_mi ?? 999) - (b.distance_mi ?? 999));
-  }, [restaurants, activeHub]);
+  }, [restaurants, activeHub, dismissedIds]);
 
   // Create the map (once, reused via ref) and (re)draw markers whenever the
   // hub or restaurant data changes. Combined into one effect so marker
