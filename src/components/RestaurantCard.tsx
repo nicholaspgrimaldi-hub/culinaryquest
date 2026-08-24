@@ -11,17 +11,25 @@ export function RestaurantCard({
   restaurant,
   wishlisted,
   visited,
+  dismissed,
   onToggleWishlist,
+  onToggleDismiss,
   onLogVisit,
 }: {
   restaurant: Restaurant;
   wishlisted?: boolean;
   visited?: boolean;
+  dismissed?: boolean;
   onToggleWishlist?: () => void;
+  onToggleDismiss?: () => void;
   onLogVisit?: () => void;
 }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-orange-100 overflow-hidden flex flex-col">
+    <div
+      className={`bg-white rounded-2xl shadow-sm border overflow-hidden flex flex-col ${
+        dismissed ? "border-stone-200 opacity-70" : "border-orange-100"
+      }`}
+    >
       <div className="relative h-44 bg-stone-200">
         {restaurant.photo_url ? (
           <img src={restaurant.photo_url} alt={restaurant.name} className="w-full h-full object-cover" />
@@ -44,11 +52,11 @@ export function RestaurantCard({
         </button>
         <div className="absolute bottom-2 left-2">
           <span
-            className={`text-xs font-bold px-2 py-1 rounded-full ${
-              visited ? "bg-emerald-500 text-white" : "bg-teal-500 text-white"
+            className={`text-xs font-bold px-2 py-1 rounded-full text-white ${
+              dismissed ? "bg-stone-500" : visited ? "bg-emerald-500" : "bg-teal-500"
             }`}
           >
-            {visited ? "Visited" : "Unvisited Gem"}
+            {dismissed ? "Ignored" : visited ? "Visited" : "Unvisited Gem"}
           </span>
         </div>
         <div className="absolute bottom-2 right-2 bg-white/90 text-xs font-bold px-2 py-1 rounded-full">
@@ -82,11 +90,23 @@ export function RestaurantCard({
           </div>
         )}
         <div className="mt-auto pt-2 flex flex-wrap gap-2">
+          {!dismissed && (
+            <button
+              onClick={onLogVisit}
+              className="flex-1 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-lg px-3 py-2"
+            >
+              Log Visit & Rate
+            </button>
+          )}
           <button
-            onClick={onLogVisit}
-            className="flex-1 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-lg px-3 py-2"
+            onClick={onToggleDismiss}
+            className={`text-sm font-semibold rounded-lg px-3 py-2 border-2 ${
+              dismissed
+                ? "flex-1 border-teal-300 text-teal-700 hover:bg-teal-50"
+                : "border-stone-300 text-stone-500 hover:bg-stone-50"
+            }`}
           >
-            Log Visit & Rate
+            {dismissed ? "↩️ Add Back to Quest" : "🚫 Remove from Consideration"}
           </button>
         </div>
         <div className="flex gap-3 text-xs">
