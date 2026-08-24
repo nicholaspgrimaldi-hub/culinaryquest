@@ -7,7 +7,7 @@ import { RestaurantCard } from "../components/RestaurantCard";
 import { AddPlaceModal } from "../components/AddPlaceModal";
 import { LogVisitModal } from "../components/LogVisitModal";
 
-type VisitedFilter = "all" | "unvisited" | "wishlist" | "visited";
+type VisitedFilter = "all" | "unvisited" | "wishlist" | "visited" | "ignored";
 type SortKey = "rating" | "closest" | "reviews" | "alpha";
 type MealTypeFilter = "all" | "coffee_breakfast" | "lunch" | "dinner";
 
@@ -23,6 +23,7 @@ export function Discover() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [visitedIds, setVisitedIds] = useState<Set<string>>(new Set());
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [radiusFilter, setRadiusFilter] = useState<number>(activeHub?.radius_miles ?? 5);
   const [sort, setSort] = useState<SortKey>("rating");
   const [visitedFilter, setVisitedFilter] = useState<VisitedFilter>("unvisited");
@@ -44,10 +45,10 @@ export function Discover() {
 
     const { data: flags } = await supabase
       .from("restaurant_flags")
-      .select("restaurant_id, wishlisted")
-      .eq("couple_id", couple.id)
-      .eq("wishlisted", true);
-    setWishlistIds(new Set((flags ?? []).map((f: any) => f.restaurant_id)));
+      .select("restaurant_id, wishlisted, dismissed")
+      .eq("couple_id", couple.id);
+    setWishlistIds(new Set((flags ?? []).filter((f: any) => f.wishlisted).map((f: any) => f.restaurant_id)));
+    setDismissedIds(new Set((flags ?? []).filter((f: any) => f.dismissed).map((f: any) => f.restaurant_id)));
 
     return restaurantRows;
   }
@@ -82,10 +83,18 @@ export function Discover() {
 
   const filtered = useMemo(() => {
     let list = withDistance.filter((r) => r.distance_mi == null || r.distance_mi <= radiusFilter);
-    if (visitedFilter === "unvisited") list = list.filter((r) => !visitedIds.has(r.id));
-    if (visitedFilter === "visited") list = list.filter((r) => visitedIds.has(r.id));
-    if (visitedFilter === "wishlist") list = list.filter((r) => wishlistIds.has(r.id));
     if (mealTypeFilter !== "all") list = list.filter((r) => r.meal_type === mealTypeFilter);
+
+    if (visitedFilter === "ignored") {
+      // The one tab where dismissed spots are the point, not the exception —
+      // this is how someone finds a place again to un-ignore it.
+      list = list.filter((r) => dismissedIds.has(r.id));
+    } else {
+      list = list.filter((r) => !dismissedIds.has(r.id));
+      if (visitedFilter === "unvisited") list = list.filter((r) => !visitedIds.has(r.id));
+      if (visitedFilter === "visited") list = list.filter((r) => visitedIds.has(r.id));
+      if (visitedFilter === "wishlist") list = list.filter((r) => wishlistIds.has(r.id));
+    }
 
     const sorted = [...list].sort((a, b) => {
       if (sort === "rating") return (b.rating ?? 0) - (a.rating ?? 0);
@@ -94,10 +103,13 @@ export function Discover() {
       return a.name.localeCompare(b.name);
     });
     return sorted;
-  }, [withDistance, radiusFilter, visitedFilter, mealTypeFilter, wishlistIds, visitedIds, sort]);
+  }, [withDistance, radiusFilter, visitedFilter, mealTypeFilter, wishlistIds, visitedIds, dismissedIds, sort]);
 
-  const conquered = visitedIds.size;
-  const total = restaurants.length;
+  // Ignored spots don't count toward the quest — they're out of scope, not
+  // "still to explore."
+  const activeRestaurantCount = restaurants.filter((r) => !dismissedIds.has(r.id)).length;
+  const conquered = [...visitedIds].filter((id) => !dismissedIds.has(id)).length;
+  const total = activeRestaurantCount;
 
   async function toggleWishlist(r: Restaurant) {
     if (!couple) return;
@@ -108,6 +120,20 @@ export function Discover() {
     setWishlistIds((prev) => {
       const next = new Set(prev);
       if (nowWishlisted) next.add(r.id);
+      else next.delete(r.id);
+      return next;
+    });
+  }
+
+  async function toggleDismiss(r: Restaurant) {
+    if (!couple) return;
+    const nowDismissed = !dismissedIds.has(r.id);
+    await supabase
+      .from("restaurant_flags")
+      .upsert({ couple_id: couple.id, restaurant_id: r.id, dismissed: nowDismissed });
+    setDismissedIds((prev) => {
+      const next = new Set(prev);
+      if (nowDismissed) next.add(r.id);
       else next.delete(r.id);
       return next;
     });
@@ -204,7 +230,7 @@ export function Discover() {
 
       <div className="bg-white rounded-2xl border border-orange-100 shadow-sm p-4 mb-6 flex flex-wrap items-center gap-3">
         <div className="flex gap-1 bg-stone-100 rounded-full p-1">
-          {(["all", "unvisited", "wishlist", "visited"] as VisitedFilter[]).map((f) => (
+          {(["all", "unvisited", "wishlist", "visited", "ignored"] as VisitedFilter[]).map((f) => (
             <button
               key={f}
               onClick={() => setVisitedFilter(f)}
@@ -212,7 +238,7 @@ export function Discover() {
                 visitedFilter === f ? "bg-white shadow text-orange-600" : "text-stone-500"
               }`}
             >
-              {f}
+              {f === "ignored" ? `🚫 Ignored${dismissedIds.size ? ` (${dismissedIds.size})` : ""}` : f}
             </button>
           ))}
         </div>
@@ -255,10 +281,14 @@ export function Discover() {
 
       {filtered.length === 0 ? (
         <div className="text-center bg-white rounded-2xl border border-dashed border-orange-200 p-12">
-          <p className="text-4xl mb-2">🍽️</p>
-          <p className="font-bold text-stone-700">No restaurants match yet</p>
+          <p className="text-4xl mb-2">{visitedFilter === "ignored" ? "🚫" : "🍽️"}</p>
+          <p className="font-bold text-stone-700">
+            {visitedFilter === "ignored" ? "Nothing ignored" : "No restaurants match yet"}
+          </p>
           <p className="text-sm text-stone-500 mt-1">
-            Try "Discover More Local Spots" above to pull real nearby restaurants in, or add one manually.
+            {visitedFilter === "ignored"
+              ? "Spots you remove from consideration (like a fast food place you'd rather skip) will show up here so you can bring them back anytime."
+              : "Try \"Discover More Local Spots\" above to pull real nearby restaurants in, or add one manually."}
           </p>
         </div>
       ) : (
@@ -269,7 +299,9 @@ export function Discover() {
               restaurant={r}
               wishlisted={wishlistIds.has(r.id)}
               visited={visitedIds.has(r.id)}
+              dismissed={dismissedIds.has(r.id)}
               onToggleWishlist={() => toggleWishlist(r)}
+              onToggleDismiss={() => toggleDismiss(r)}
               onLogVisit={() => setLogVisitFor(r)}
             />
           ))}
