@@ -49,6 +49,14 @@ export function RadarMap() {
       });
   }, [activeHub?.id, couple?.id]);
 
+  async function toggleDismiss(r: Restaurant) {
+    if (!couple) return;
+    await supabase
+      .from("restaurant_flags")
+      .upsert({ couple_id: couple.id, restaurant_id: r.id, dismissed: true });
+    setDismissedIds((prev) => new Set(prev).add(r.id));
+  }
+
   const sorted = useMemo(() => {
     if (!activeHub) return [];
     return restaurants
@@ -90,6 +98,17 @@ export function RadarMap() {
 
         const bounds = new google.maps.LatLngBounds();
         const infoWindow = new google.maps.InfoWindow();
+        let infoWindowRestaurant: Restaurant | null = null;
+        google.maps.event.addListener(infoWindow, "domready", () => {
+          const btn = document.getElementById("iw-dismiss-btn");
+          if (btn && infoWindowRestaurant) {
+            const r = infoWindowRestaurant;
+            btn.onclick = () => {
+              toggleDismiss(r);
+              infoWindow.close();
+            };
+          }
+        });
 
         const homeMarker = new google.maps.Marker({
           position: { lat: activeHub.lat, lng: activeHub.lng },
@@ -126,12 +145,14 @@ export function RadarMap() {
             },
           });
           marker.addListener("click", () => {
+            infoWindowRestaurant = r;
             infoWindow.setContent(
               `<div style="font-family: sans-serif; min-width: 160px;">` +
                 `<p style="font-weight: 700; margin: 0 0 2px;">${escapeHtml(r.name)}</p>` +
-                `<p style="font-size: 12px; color: #78716c; margin: 0;">${escapeHtml(r.city ?? "")}` +
+                `<p style="font-size: 12px; color: #78716c; margin: 0 0 6px;">${escapeHtml(r.city ?? "")}` +
                 `${r.rating ? ` · ⭐ ${r.rating}` : ""}` +
                 `${r.distance_mi != null ? ` · ${r.distance_mi.toFixed(1)} mi` : ""}</p>` +
+                `<button id="iw-dismiss-btn" style="font-size: 11px; font-weight: 600; color: #78716c; background: #f5f5f4; border: none; border-radius: 6px; padding: 4px 8px; cursor: pointer;">🚫 Remove from Consideration</button>` +
                 `</div>`
             );
             infoWindow.open({ map, anchor: marker });
@@ -217,6 +238,14 @@ export function RadarMap() {
               {r.distance_mi != null && (
                 <span className="text-xs font-bold text-stone-500 shrink-0">{r.distance_mi.toFixed(1)} mi</span>
               )}
+              <button
+                onClick={() => toggleDismiss(r)}
+                className="text-stone-400 hover:text-red-500 text-xs shrink-0"
+                aria-label="Remove from consideration"
+                title="Remove from consideration"
+              >
+                🚫
+              </button>
             </div>
           );
         })}
