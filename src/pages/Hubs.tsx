@@ -2,12 +2,19 @@ import { useState } from "react";
 import { useCouple } from "../context/CoupleProvider";
 import { callEdgeFunction, supabase } from "../lib/supabaseClient";
 
+const MEAL_TYPE_LABEL: Record<string, string> = {
+  coffee_breakfast: "☕ Coffee & Breakfast",
+  lunch: "🥪 Lunch",
+  dinner: "🌙 Dinner",
+};
+
 export function Hubs() {
   const { hubs, activeHub, switchHub, createHub, refresh } = useCouple();
   const [adding, setAdding] = useState(false);
   const [label, setLabel] = useState("");
   const [address, setAddress] = useState("");
   const [hubType, setHubType] = useState<"vacation" | "work" | "other">("vacation");
+  const [mealType, setMealType] = useState<"coffee_breakfast" | "lunch" | "dinner" | "">("");
   const [radius, setRadius] = useState(10);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -16,6 +23,10 @@ export function Hubs() {
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
+    if (!mealType) {
+      setError("Choose what this hub is for (coffee & breakfast, lunch, or dinner) before creating it.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -29,10 +40,12 @@ export function Hubs() {
         state: geo.state,
         radius_miles: radius,
         hub_type: hubType,
+        meal_type: mealType,
       });
       setAdding(false);
       setLabel("");
       setAddress("");
+      setMealType("");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -78,6 +91,11 @@ export function Hubs() {
                 <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-stone-100 text-stone-500">
                   {hub.hub_type}
                 </span>
+                {hub.meal_type && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700">
+                    {MEAL_TYPE_LABEL[hub.meal_type]}
+                  </span>
+                )}
                 {hub.is_active && (
                   <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-600">
                     Active Radar
@@ -148,12 +166,50 @@ export function Hubs() {
               ))}
             </select>
           </div>
+          <div>
+            <label className="text-xs font-bold text-stone-500 uppercase">What's this hub for? *</label>
+            <p className="text-xs text-stone-400 mb-1">
+              Each hub searches for one meal occasion, so its results stay on-topic — add a separate hub for the same
+              area if you also want a dinner-focused (or lunch, or breakfast) quest there.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  { value: "coffee_breakfast", label: "☕ Coffee & Breakfast" },
+                  { value: "lunch", label: "🥪 Lunch" },
+                  { value: "dinner", label: "🌙 Dinner" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setMealType(opt.value)}
+                  className={`text-xs font-semibold rounded-full px-3 py-1.5 border ${
+                    mealType === opt.value ? "bg-teal-500 text-white border-teal-500" : "border-stone-300 text-stone-600"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
           {error && <p className="text-xs text-red-500">{error}</p>}
           <div className="flex gap-2">
-            <button disabled={busy} className="flex-1 bg-orange-500 text-white font-semibold rounded-lg px-3 py-2 text-sm">
+            <button
+              disabled={busy || !mealType}
+              className="flex-1 bg-orange-500 disabled:opacity-50 text-white font-semibold rounded-lg px-3 py-2 text-sm"
+            >
               {busy ? "Locating…" : "Create hub"}
             </button>
-            <button type="button" onClick={() => setAdding(false)} className="flex-1 border rounded-lg px-3 py-2 text-sm">
+            <button
+              type="button"
+              onClick={() => {
+                setAdding(false);
+                setMealType("");
+                setError(null);
+              }}
+              className="flex-1 border rounded-lg px-3 py-2 text-sm"
+            >
               Cancel
             </button>
           </div>
