@@ -28,7 +28,6 @@ export function AddPlaceModal({ onClose, onSaved }: { onClose: () => void; onSav
   const [rating, setRating] = useState("4.8");
   const [reviewCount, setReviewCount] = useState("");
   const [priceLevel, setPriceLevel] = useState(3);
-  const [mealType, setMealType] = useState<"" | "coffee_breakfast" | "lunch" | "dinner">("");
   const [cuisines, setCuisines] = useState<string[]>([]);
   const [dishes, setDishes] = useState("");
   const [photoUrl, setPhotoUrl] = useState("");
@@ -58,7 +57,9 @@ export function AddPlaceModal({ onClose, onSaved }: { onClose: () => void; onSav
         rating: rating ? Number(rating) : null,
         review_count: reviewCount ? Number(reviewCount) : null,
         price_level: priceLevel,
-        meal_type: mealType || null,
+        // Every restaurant in a hub shares that hub's meal focus now, rather
+        // than being tagged individually.
+        meal_type: activeHub.meal_type,
         cuisines,
         signature_dishes: dishes ? dishes.split(",").map((d) => d.trim()).filter(Boolean) : [],
         photo_url: photoUrl || null,
@@ -127,28 +128,6 @@ export function AddPlaceModal({ onClose, onSaved }: { onClose: () => void; onSav
                 <option value={3}>$$$</option>
                 <option value={4}>$$$$</option>
               </select>
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-stone-500 uppercase">Meal type</label>
-            <div className="flex flex-wrap gap-2 mt-1">
-              {([
-                { value: "", label: "Any / not specified" },
-                { value: "coffee_breakfast", label: "☕ Coffee & Breakfast" },
-                { value: "lunch", label: "🥪 Lunch" },
-                { value: "dinner", label: "🌙 Dinner" },
-              ] as const).map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setMealType(opt.value)}
-                  className={`text-xs font-semibold rounded-full px-3 py-1.5 border ${
-                    mealType === opt.value ? "bg-orange-500 text-white border-orange-500" : "border-stone-300 text-stone-600"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
             </div>
           </div>
           <div>
