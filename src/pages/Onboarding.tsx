@@ -8,6 +8,7 @@ export function Onboarding() {
   const [address, setAddress] = useState("");
   const [hubLabel, setHubLabel] = useState("Primary Home Base");
   const [radius, setRadius] = useState(5);
+  const [mealType, setMealType] = useState<"coffee_breakfast" | "lunch" | "dinner" | "">("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,6 +54,10 @@ export function Onboarding() {
 
   async function handleCreateHub(e: React.FormEvent) {
     e.preventDefault();
+    if (!mealType) {
+      setError("Choose what this hub is for (coffee & breakfast, lunch, or dinner) before creating it.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -72,6 +77,7 @@ export function Onboarding() {
         state: geo.state,
         radius_miles: radius,
         hub_type: "primary",
+        meal_type: mealType,
       });
     } catch (err: any) {
       setError(err.message);
@@ -135,8 +141,29 @@ export function Onboarding() {
               <option value={20}>20 miles</option>
               <option value={30}>30 miles</option>
             </select>
+            <label className="text-xs font-bold text-stone-500 uppercase">What's this hub for?</label>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  { value: "coffee_breakfast", label: "☕ Coffee & Breakfast" },
+                  { value: "lunch", label: "🥪 Lunch" },
+                  { value: "dinner", label: "🌙 Dinner" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setMealType(opt.value)}
+                  className={`text-xs font-semibold rounded-full px-3 py-1.5 border ${
+                    mealType === opt.value ? "bg-teal-500 text-white border-teal-500" : "border-stone-300 text-stone-600"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
             <button
-              disabled={busy}
+              disabled={busy || !mealType}
               className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-3"
             >
               {busy ? "Locating…" : "Create hub & start discovering"}
