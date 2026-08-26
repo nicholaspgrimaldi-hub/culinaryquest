@@ -9,14 +9,20 @@ import { LogVisitModal } from "../components/LogVisitModal";
 
 type VisitedFilter = "all" | "unvisited" | "wishlist" | "visited" | "ignored";
 type SortKey = "rating" | "closest" | "reviews" | "alpha";
-type MealTypeFilter = "all" | "coffee_breakfast" | "lunch" | "dinner";
 
-const MEAL_TYPE_OPTIONS: { value: MealTypeFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "coffee_breakfast", label: "☕ Coffee & Breakfast" },
-  { value: "lunch", label: "🥪 Lunch" },
-  { value: "dinner", label: "🌙 Dinner" },
-];
+const MEAL_TYPE_LABEL: Record<string, string> = {
+  coffee_breakfast: "☕ Coffee & Breakfast",
+  lunch: "🥪 Lunch",
+  dinner: "🌙 Dinner",
+};
+
+// Google Places doesn't have a precise breakfast/lunch/dinner filter, so a
+// hub's meal focus is folded into the text search query itself.
+const MEAL_TYPE_SEARCH_KEYWORD: Record<string, string> = {
+  coffee_breakfast: "breakfast and coffee",
+  lunch: "lunch",
+  dinner: "dinner",
+};
 
 export function Discover() {
   const { activeHub, couple } = useCouple();
@@ -27,7 +33,6 @@ export function Discover() {
   const [radiusFilter, setRadiusFilter] = useState<number>(activeHub?.radius_miles ?? 5);
   const [sort, setSort] = useState<SortKey>("rating");
   const [visitedFilter, setVisitedFilter] = useState<VisitedFilter>("unvisited");
-  const [mealTypeFilter, setMealTypeFilter] = useState<MealTypeFilter>("all");
   const [discovering, setDiscovering] = useState(false);
   const [discoverError, setDiscoverError] = useState<string | null>(null);
   const [showAddPlace, setShowAddPlace] = useState(false);
@@ -83,7 +88,6 @@ export function Discover() {
 
   const filtered = useMemo(() => {
     let list = withDistance.filter((r) => r.distance_mi == null || r.distance_mi <= radiusFilter);
-    if (mealTypeFilter !== "all") list = list.filter((r) => r.meal_type === mealTypeFilter);
 
     if (visitedFilter === "ignored") {
       // The one tab where dismissed spots are the point, not the exception —
@@ -103,7 +107,7 @@ export function Discover() {
       return a.name.localeCompare(b.name);
     });
     return sorted;
-  }, [withDistance, radiusFilter, visitedFilter, mealTypeFilter, wishlistIds, visitedIds, dismissedIds, sort]);
+  }, [withDistance, radiusFilter, visitedFilter, wishlistIds, visitedIds, dismissedIds, sort]);
 
   // Ignored spots don't count toward the quest — they're out of scope, not
   // "still to explore."
@@ -149,6 +153,9 @@ export function Discover() {
         lat: activeHub.lat,
         lng: activeHub.lng,
         radiusMiles: activeHub.radius_miles,
+        // Scope the actual Google search to this hub's meal focus (older hubs
+        // created before that field existed just search generally).
+        keyword: activeHub.meal_type ? MEAL_TYPE_SEARCH_KEYWORD[activeHub.meal_type] : undefined,
       });
       const rows = places.map((p) => ({
         hub_id: activeHub.id,
@@ -164,6 +171,9 @@ export function Discover() {
         cuisines: p.cuisines ?? [],
         photo_url: p.photo_url,
         source: "places",
+        // Stamp every discovered restaurant with the hub's meal focus, since
+        // the search itself was already scoped to it.
+        meal_type: activeHub.meal_type,
       }));
       if (rows.length > 0) {
         const { error: upsertError } = await supabase
@@ -188,6 +198,11 @@ export function Discover() {
           <span className="text-xs font-bold uppercase bg-red-100 text-red-600 px-3 py-1 rounded-full">
             🔥 {activeHub.radius_miles}-Mile Foodie Quest
           </span>
+          {activeHub.meal_type && (
+            <span className="text-xs font-bold uppercase bg-teal-100 text-teal-700 px-3 py-1 rounded-full">
+              {MEAL_TYPE_LABEL[activeHub.meal_type]}
+            </span>
+          )}
           <span className="text-xs text-stone-500">Origin: {activeHub.city ?? activeHub.label}</span>
         </div>
         <h1 className="text-3xl font-extrabold text-stone-800">Visit Every High-Rated Spot in Your Area</h1>
@@ -263,20 +278,6 @@ export function Discover() {
           ))}
         </div>
         <span className="ml-auto text-xs text-stone-400">Showing {filtered.length} places</span>
-        <div className="w-full flex items-center gap-2 text-sm border-t border-stone-100 pt-3 mt-1">
-          <span className="text-stone-500">Meal:</span>
-          {MEAL_TYPE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setMealTypeFilter(opt.value)}
-              className={`text-xs font-bold rounded-full px-3 py-1.5 border ${
-                mealTypeFilter === opt.value ? "bg-teal-500 text-white border-teal-500" : "border-stone-300 text-stone-600"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {filtered.length === 0 ? (
