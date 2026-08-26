@@ -33,6 +33,7 @@ export type Hub = {
   state: string | null;
   radius_miles: number;
   hub_type: "primary" | "vacation" | "work" | "other";
+  meal_type: "coffee_breakfast" | "lunch" | "dinner" | null;
   is_active: boolean;
   created_at: string;
 };
